@@ -11,8 +11,8 @@ KEY = 0x77
 
 arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument("exe", type=str, help="target program")
-arg_parser.add_argument('--range', dest="range", action='append', help='manual encryption range')
-arg_parser.add_argument('--ranges', dest="ranges", nargs='+', help='manual encryption range')
+arg_parser.add_argument('--range', dest="range", action='append', metavar='0xVADDR,0xPSIZE', help='manual encryption range')
+arg_parser.add_argument('--ranges', dest="ranges", nargs='+', metavar='0xVADDR,0xPSIZE 0xVADDR,PSIZE 0xVADDR-0xVADDR', help='manual encryption range')
 args = arg_parser.parse_args(argv[1:])
 ranges = args.ranges or args.range
 
@@ -148,14 +148,24 @@ def patch_IAT(pe):
     for lib in pe.DIRECTORY_ENTRY_IMPORT:
         if lib.dll.lower() == b'kernel32.dll':
             for func in lib.imports:
-                if not LoadLibraryA and len(func.name) == len("LoadLibraryA"):
-                    LoadLibraryA = [func.address, func.name]
-                    pe.set_bytes_at_rva(func.struct_table.Function+2, b"LoadLibraryA")
-                    print(f"[+] IAT {hex(func.address)}: {func.name} -> LoadLibraryA")
-                elif not GetProcAddress and len(func.name) == len("GetProcAddress"):
-                    GetProcAddress = [func.address, func.name]
-                    pe.set_bytes_at_rva(func.struct_table.Function+2, b"GetProcAddress")
-                    print(f"[+] IAT {hex(func.address)}: {func.name} -> GetProcAddress")
+                if not LoadLibraryA:
+                    if len(func.name) == len("LoadLibraryA"):
+                        LoadLibraryA = [func.address, func.name]
+                        pe.set_bytes_at_rva(func.struct_table.Function+2, b"LoadLibraryA")
+                        print(f"[+] IAT {hex(func.address)}: {func.name} -> LoadLibraryA")    
+                    elif len(func.name) > len("LoadLibraryA"):
+                        LoadLibraryA = [func.address, func.name]
+                        pe.set_bytes_at_rva(func.struct_table.Function+2, b"LoadLibraryA\x00")
+                        print(f"[+] IAT {hex(func.address)}: {func.name} -> LoadLibraryA")
+                elif not GetProcAddress:
+                    if len(func.name) == len("GetProcAddress"):
+                        GetProcAddress = [func.address, func.name]
+                        pe.set_bytes_at_rva(func.struct_table.Function+2, b"GetProcAddress")
+                        print(f"[+] IAT {hex(func.address)}: {func.name} -> GetProcAddress")
+                    elif len(func.name) > len("GetProcAddress"):
+                        GetProcAddress = [func.address, func.name]
+                        pe.set_bytes_at_rva(func.struct_table.Function+2, b"GetProcAddress\x00")
+                        print(f"[+] IAT {hex(func.address)}: {func.name} -> GetProcAddress")
     if not LoadLibraryA or not GetProcAddress:
         print("[!] IAT not found appropriate function")
         exit()
